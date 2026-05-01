@@ -35,7 +35,7 @@ function renderAttachments() {
     <div class="attachment-chip">
       <span>${escapeHtml(file.name)}</span>
       <small>${formatFileSize(file.size)}</small>
-      <button type="button" data-index="${index}" aria-label="移除附件">×</button>
+      <button type="button" data-index="${index}" aria-label="Remove attachment">×</button>
     </div>
   `).join('');
   box.querySelectorAll('button').forEach(btn => {
@@ -50,11 +50,11 @@ function addAttachments(fileList) {
   const incoming = Array.from(fileList || []);
   const remaining = 5 - state.attachments.length;
   if (remaining <= 0) {
-    alert('最多只能添加 5 个附件');
+    alert('You can attach up to 5 files.');
     return;
   }
   if (incoming.length > remaining) {
-    alert(`最多还能添加 ${remaining} 个附件`);
+    alert(`You can add ${remaining} attachment(s)`);
   }
   state.attachments.push(...incoming.slice(0, remaining));
   renderAttachments();
@@ -63,7 +63,7 @@ function addAttachments(fileList) {
 function renderSessions() {
   const list = $('sessionList');
   if (!state.sessions.length) {
-    list.innerHTML = '<div class="empty"><p>没有找到会话</p></div>';
+    list.innerHTML = '<div class="empty"><p>No sessions found</p></div>';
     return;
   }
   list.innerHTML = state.sessions.map(s => `
@@ -118,7 +118,7 @@ function renderDetail() {
     .filter(m => ['user', 'assistant'].includes(m.role) && (m.content || '').trim())
     .map(m => ({
       ...m,
-      label: m.role === 'user' ? '你' : 'Hermes',
+      label: m.role === 'user' ? 'You' : 'Hermes',
     }));
 
   $('messages').innerHTML = chatMessages.length ? chatMessages.map(m => `
@@ -128,7 +128,7 @@ function renderDetail() {
         <div class="content">${escapeHtml(m.content || '')}</div>
       </div>
     </article>
-  `).join('') : '<div class="empty inline"><p>这个会话里没有可显示的用户/助手消息。</p></div>';
+  `).join('') : '<div class="empty inline"><p>No user/assistant messages to display in this session.</p></div>';
 
   requestAnimationFrame(() => {
     const main = document.querySelector('.main');
@@ -140,7 +140,7 @@ async function createNewChat() {
   if (state.sending) return;
   const btn = $('newChatBtn');
   btn.disabled = true;
-  btn.textContent = '创建中...';
+  btn.textContent = 'Creating...';
   try {
     const data = await api('/api/sessions/new', { method: 'POST', body: '{}' });
     await loadSessions();
@@ -151,7 +151,7 @@ async function createNewChat() {
     alert(err.message || String(err));
   } finally {
     btn.disabled = false;
-    btn.textContent = '＋ 开始新对话';
+    btn.textContent = '＋ New Chat';
   }
 }
 
@@ -165,14 +165,14 @@ async function sendMessage(event) {
   const filesToSend = [...state.attachments];
   state.sending = true;
   $('sendBtn').disabled = true;
-  $('sendBtn').textContent = '发送中...';
+  $('sendBtn').textContent = 'Sending...';
   input.disabled = true;
 
   const previousMessages = state.selected.messages || [];
   state.selected.messages = [
     ...previousMessages,
-    { role: 'user', content: message || `[发送了 ${filesToSend.length} 个附件]`, timestamp: '' },
-    { role: 'assistant', content: 'Hermes 正在回复...', timestamp: '' },
+    { role: 'user', content: message || `[Sent ${filesToSend.length} attachment(s)]`, timestamp: '' },
+    { role: 'assistant', content: 'Hermes is replying...', timestamp: '' },
   ];
   input.value = '';
   state.attachments = [];
@@ -200,7 +200,7 @@ async function sendMessage(event) {
     state.sending = false;
     input.disabled = false;
     $('sendBtn').disabled = false;
-    $('sendBtn').textContent = '发送';
+    $('sendBtn').textContent = 'Send';
     input.focus();
   }
 }
@@ -208,13 +208,13 @@ async function sendMessage(event) {
 async function copyResume() {
   if (!state.selected) return;
   await navigator.clipboard.writeText(state.selected.resume_command);
-  $('copyResumeBtn').textContent = '已复制';
-  setTimeout(() => $('copyResumeBtn').textContent = '复制恢复命令', 1000);
+  $('copyResumeBtn').textContent = 'Copied';
+  setTimeout(() => $('copyResumeBtn').textContent = 'Copy Resume Command', 1000);
 }
 
 async function renameSession() {
   if (!state.selected) return;
-  const title = prompt('输入新标题：', state.selected.title);
+  const title = prompt('Enter a new title:', state.selected.title);
   if (!title || !title.trim()) return;
   const data = await api(`/api/sessions/${encodeURIComponent(state.selected.id)}/rename`, {
     method: 'POST',
@@ -227,7 +227,7 @@ async function renameSession() {
 
 async function deleteSession() {
   if (!state.selected) return;
-  if (!confirm(`确定删除会话？\n${state.selected.title}\n${state.selected.id}`)) return;
+  if (!confirm(`Delete this session?\n${state.selected.title}\n${state.selected.id}`)) return;
   const id = state.selected.id;
   const data = await api(`/api/sessions/${encodeURIComponent(id)}/delete`, { method: 'POST', body: '{}' });
   if (!data.ok) throw new Error(data.output || 'Delete failed');

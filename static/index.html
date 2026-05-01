@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -16,15 +16,15 @@
         </div>
         <button id="refreshBtn" title="Refresh">↻</button>
       </div>
-      <input id="searchInput" class="search" placeholder="搜索会话 / 标题 / 内容..." />
-      <button id="newChatBtn" class="new-chat-btn" type="button">＋ 开始新对话</button>
+      <input id="searchInput" class="search" placeholder="Search sessions / titles / content..." />
+      <button id="newChatBtn" class="new-chat-btn" type="button">＋ New Chat</button>
       <div id="sessionList" class="session-list"></div>
     </aside>
 
     <main class="main">
       <section id="emptyState" class="empty">
-        <h2>选择一个会话</h2>
-        <p>左侧搜索或点击会话，右侧查看详情、复制恢复命令、重命名或删除。</p>
+        <h2>Select a session</h2>
+        <p>Search or select a session on the left. View details, copy the resume command, rename, or delete on the right.</p>
       </section>
 
       <section id="detail" class="detail hidden">
@@ -34,9 +34,9 @@
             <p id="sessionMeta"></p>
           </div>
           <div class="actions">
-            <button id="copyResumeBtn">复制恢复命令</button>
-            <button id="renameBtn">重命名</button>
-            <button id="deleteBtn" class="danger">删除</button>
+            <button id="copyResumeBtn">Copy Resume Command</button>
+            <button id="renameBtn">Rename</button>
+            <button id="deleteBtn" class="danger">Delete</button>
           </div>
         </div>
         <div id="commandBox" class="command"></div>
@@ -45,9 +45,9 @@
         <form id="chatForm" class="composer">
           <div id="attachmentList" class="attachment-list"></div>
           <input id="fileInput" type="file" multiple hidden />
-          <button id="attachBtn" class="attach-btn" type="button" title="添加附件">＋附件</button>
-          <textarea id="chatInput" placeholder="输入消息，Enter 发送，Shift+Enter 换行"></textarea>
-          <button id="sendBtn" type="submit">发送</button>
+          <button id="attachBtn" class="attach-btn" type="button" title="Add attachment">＋ Attach</button>
+          <textarea id="chatInput" placeholder="Type a message. Enter to send, Shift+Enter for a new line"></textarea>
+          <button id="sendBtn" type="submit">Send</button>
         </form>
       </section>
     </main>
