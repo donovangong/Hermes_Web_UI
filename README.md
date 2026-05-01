@@ -2,6 +2,10 @@
 
 A lightweight local web interface for browsing and continuing Hermes Agent sessions from a browser.
 
+<p align="center">
+  <img src="images/dashboard.png" alt="Dashboard screenshot" width="700">
+</p>
+
 This project is intentionally simple:
 
 - Python standard library backend
