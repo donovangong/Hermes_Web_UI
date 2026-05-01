@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local config and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.crt
+*.p12
+
+# Hermes/user runtime data - do not commit private sessions or state
+.hermes/
+state.db
+*.db
+*.sqlite
+*.sqlite3
+sessions/
+logs/
+uploads/
+attachments/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node/build artifacts if added later
+node_modules/
+dist/
+build/
+coverage/

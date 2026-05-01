@@ -1,0 +1,211 @@
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --panel-2: rgb(0, 94, 184);
+  --text: rgb(0, 51, 141);
+  --muted: rgba(0, 51, 141, 0.68);
+  --line: rgba(0, 51, 141, 0.18);
+  --accent: rgb(0, 94, 184);
+  --accent-dark: rgb(0, 51, 141);
+  --danger: #c62828;
+  --ok: rgb(0, 94, 184);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+.app { display: grid; grid-template-columns: 360px 1fr; height: 100vh; }
+.sidebar {
+  border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, #ffffff, rgba(0, 94, 184, 0.08));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.brand { display: flex; align-items: center; justify-content: space-between; padding: 18px; }
+.brand h1 { margin: 0; font-size: 22px; }
+.brand p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+button {
+  background: #ffffff;
+  border: 1px solid var(--accent);
+  color: var(--accent-dark);
+  border-radius: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button.danger { color: var(--danger); }
+.search {
+  margin: 0 18px 14px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--text);
+  outline: none;
+}
+.search:focus { border-color: var(--accent); }
+.new-chat-btn {
+  margin: 0 18px 14px;
+  width: calc(100% - 36px);
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+  color: #ffffff;
+  font-weight: 700;
+}
+.new-chat-btn:disabled { opacity: 0.65; cursor: wait; }
+.session-list { overflow: auto; padding: 0 10px 16px; }
+.session-card {
+  padding: 13px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.session-card:hover, .session-card.active { background: rgba(0, 94, 184, 0.07); border-color: var(--line); }
+.session-card.active { border-color: var(--accent); }
+.session-card h3 { margin: 0 0 6px; font-size: 15px; line-height: 1.3; }
+.session-card p { margin: 0 0 8px; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.badge { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 7px; }
+.main { overflow: auto; padding-bottom: 16px; }
+.empty { max-width: 720px; margin: 20vh auto; text-align: center; color: var(--muted); }
+.empty h2 { color: var(--text); }
+.hidden { display: none; }
+.detail { padding: 28px 28px 6px; }
+.detail-header { display: flex; justify-content: space-between; gap: 20px; align-items: start; border-bottom: 1px solid var(--line); padding-bottom: 18px; }
+.detail-header h2 { margin: 0 0 8px; }
+.detail-header p { margin: 0; color: var(--muted); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.command, .stats {
+  margin: 16px 0;
+  padding: 13px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 14px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+.stats { display: flex; gap: 10px; flex-wrap: wrap; font-family: inherit; }
+.stat { background: rgba(0, 94, 184, 0.06); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.messages { display: flex; flex-direction: column; gap: 18px; max-width: 980px; margin: 0 auto; }
+.message {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.message.user { grid-template-columns: 1fr 72px; }
+.message.user .avatar { grid-column: 2; grid-row: 1; background: rgb(0, 94, 184); color: #ffffff; }
+.message.user .bubble { grid-column: 1; grid-row: 1; justify-self: end; background: rgba(0, 94, 184, 0.08); }
+.avatar {
+  width: 58px;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: #ffffff;
+  background: rgb(0, 51, 141);
+  font-size: 13px;
+  font-weight: 700;
+}
+.bubble {
+  max-width: 760px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.content { padding: 15px 17px; white-space: pre-wrap; line-height: 1.6; overflow-wrap: anywhere; max-height: 720px; overflow: auto; }
+.empty.inline { margin: 24px auto; }
+.composer {
+  position: sticky;
+  bottom: 0;
+  max-width: 980px;
+  margin: 14px auto 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 34px rgba(0, 51, 141, 0.14);
+}
+.attachment-list {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 260px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(0, 94, 184, 0.07);
+  color: var(--accent-dark);
+  font-size: 12px;
+}
+.attachment-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attachment-chip small { color: var(--muted); }
+.attachment-chip button {
+  min-width: auto;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  line-height: 1;
+}
+.attach-btn {
+  min-width: 78px;
+  background: #ffffff;
+  color: var(--accent-dark);
+}
+.composer textarea {
+  min-height: 48px;
+  max-height: 180px;
+  resize: vertical;
+  border: 0;
+  outline: none;
+  color: var(--text);
+  background: transparent;
+  padding: 12px 10px;
+  line-height: 1.45;
+  font: inherit;
+}
+.composer button {
+  min-width: 84px;
+  align-self: end;
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+  color: #ffffff;
+  font-weight: 700;
+}
+.composer button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { height: 42vh; border-right: 0; border-bottom: 1px solid var(--line); }
+  .detail-header { flex-direction: column; }
+  .composer { grid-template-columns: 1fr; bottom: 0; }
+  .composer button { width: 100%; }
+}

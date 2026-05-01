@@ -1,0 +1,266 @@
+const state = { sessions: [], selectedId: null, selected: null, attachments: [], sending: false };
+
+const $ = (id) => document.getElementById(id);
+
+async function api(path, options = {}) {
+  const headers = options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' };
+  const res = await fetch(path, {
+    headers,
+    ...options,
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || data.output || 'Request failed');
+  return data;
+}
+
+function escapeHtml(text) {
+  return String(text ?? '').replace(/[&<>'"]/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[c]));
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function renderAttachments() {
+  const box = $('attachmentList');
+  if (!state.attachments.length) {
+    box.innerHTML = '';
+    return;
+  }
+  box.innerHTML = state.attachments.map((file, index) => `
+    <div class="attachment-chip">
+      <span>${escapeHtml(file.name)}</span>
+      <small>${formatFileSize(file.size)}</small>
+      <button type="button" data-index="${index}" aria-label="移除附件">×</button>
+    </div>
+  `).join('');
+  box.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.attachments.splice(Number(btn.dataset.index), 1);
+      renderAttachments();
+    });
+  });
+}
+
+function addAttachments(fileList) {
+  const incoming = Array.from(fileList || []);
+  const remaining = 5 - state.attachments.length;
+  if (remaining <= 0) {
+    alert('最多只能添加 5 个附件');
+    return;
+  }
+  if (incoming.length > remaining) {
+    alert(`最多还能添加 ${remaining} 个附件`);
+  }
+  state.attachments.push(...incoming.slice(0, remaining));
+  renderAttachments();
+}
+
+function renderSessions() {
+  const list = $('sessionList');
+  if (!state.sessions.length) {
+    list.innerHTML = '<div class="empty"><p>没有找到会话</p></div>';
+    return;
+  }
+  list.innerHTML = state.sessions.map(s => `
+    <article class="session-card ${s.id === state.selectedId ? 'active' : ''}" data-id="${escapeHtml(s.id)}">
+      <h3>${escapeHtml(s.title)}</h3>
+      <p>${escapeHtml(s.preview || 'No preview')}</p>
+      <div class="badges">
+        <span class="badge">${escapeHtml(s.last_active || '')}</span>
+        <span class="badge">${escapeHtml(s.source || '')}</span>
+        <span class="badge">${escapeHtml(s.model || '')}</span>
+        <span class="badge">${s.message_count || 0} msgs</span>
+      </div>
+    </article>
+  `).join('');
+  document.querySelectorAll('.session-card').forEach(card => {
+    card.addEventListener('click', () => loadSession(card.dataset.id));
+  });
+}
+
+async function loadSessions() {
+  const q = encodeURIComponent($('searchInput').value.trim());
+  const data = await api(`/api/sessions?q=${q}`);
+  state.sessions = data.sessions;
+  renderSessions();
+}
+
+async function loadSession(id) {
+  state.selectedId = id;
+  state.attachments = [];
+  renderAttachments();
+  renderSessions();
+  const data = await api(`/api/sessions/${encodeURIComponent(id)}`);
+  state.selected = data.session;
+  renderDetail();
+}
+
+function renderDetail() {
+  const s = state.selected;
+  $('emptyState').classList.add('hidden');
+  $('detail').classList.remove('hidden');
+  $('sessionTitle').textContent = s.title;
+  $('sessionMeta').textContent = `${s.id} · ${s.source || ''} · ${s.model || ''} · ${s.started_at || ''}`;
+  $('commandBox').textContent = s.resume_command;
+  const tokenTotal = Object.values(s.tokens || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+  $('stats').innerHTML = `
+    <span class="stat">Messages: ${s.message_count || 0}</span>
+    <span class="stat">Tool calls: ${s.tool_call_count || 0}</span>
+    <span class="stat">Tokens: ${tokenTotal}</span>
+    <span class="stat">JSON: ${escapeHtml(s.json_path || '')}</span>
+  `;
+  const chatMessages = (s.messages || [])
+    .filter(m => ['user', 'assistant'].includes(m.role) && (m.content || '').trim())
+    .map(m => ({
+      ...m,
+      label: m.role === 'user' ? '你' : 'Hermes',
+    }));
+
+  $('messages').innerHTML = chatMessages.length ? chatMessages.map(m => `
+    <article class="message ${escapeHtml(m.role)}">
+      <div class="avatar">${escapeHtml(m.label)}</div>
+      <div class="bubble">
+        <div class="content">${escapeHtml(m.content || '')}</div>
+      </div>
+    </article>
+  `).join('') : '<div class="empty inline"><p>这个会话里没有可显示的用户/助手消息。</p></div>';
+
+  requestAnimationFrame(() => {
+    const main = document.querySelector('.main');
+    main.scrollTo({ top: main.scrollHeight, behavior: 'smooth' });
+  });
+}
+
+async function createNewChat() {
+  if (state.sending) return;
+  const btn = $('newChatBtn');
+  btn.disabled = true;
+  btn.textContent = '创建中...';
+  try {
+    const data = await api('/api/sessions/new', { method: 'POST', body: '{}' });
+    await loadSessions();
+    if (data.session && data.session.id) {
+      await loadSession(data.session.id);
+    }
+  } catch (err) {
+    alert(err.message || String(err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '＋ 开始新对话';
+  }
+}
+
+async function sendMessage(event) {
+  event.preventDefault();
+  if (!state.selected || state.sending) return;
+  const input = $('chatInput');
+  const message = input.value.trim();
+  if (!message && !state.attachments.length) return;
+
+  const filesToSend = [...state.attachments];
+  state.sending = true;
+  $('sendBtn').disabled = true;
+  $('sendBtn').textContent = '发送中...';
+  input.disabled = true;
+
+  const previousMessages = state.selected.messages || [];
+  state.selected.messages = [
+    ...previousMessages,
+    { role: 'user', content: message || `[发送了 ${filesToSend.length} 个附件]`, timestamp: '' },
+    { role: 'assistant', content: 'Hermes 正在回复...', timestamp: '' },
+  ];
+  input.value = '';
+  state.attachments = [];
+  renderAttachments();
+  renderDetail();
+
+  try {
+    const formData = new FormData();
+    formData.append('message', message);
+    filesToSend.forEach(file => formData.append('files', file, file.name));
+    const data = await api(`/api/sessions/${encodeURIComponent(state.selected.id)}/chat`, {
+      method: 'POST',
+      body: formData,
+    });
+    state.selected = data.session;
+    renderDetail();
+    await loadSessions();
+  } catch (err) {
+    state.selected.messages = previousMessages;
+    state.attachments = filesToSend;
+    renderAttachments();
+    renderDetail();
+    alert(err.message || String(err));
+  } finally {
+    state.sending = false;
+    input.disabled = false;
+    $('sendBtn').disabled = false;
+    $('sendBtn').textContent = '发送';
+    input.focus();
+  }
+}
+
+async function copyResume() {
+  if (!state.selected) return;
+  await navigator.clipboard.writeText(state.selected.resume_command);
+  $('copyResumeBtn').textContent = '已复制';
+  setTimeout(() => $('copyResumeBtn').textContent = '复制恢复命令', 1000);
+}
+
+async function renameSession() {
+  if (!state.selected) return;
+  const title = prompt('输入新标题：', state.selected.title);
+  if (!title || !title.trim()) return;
+  const data = await api(`/api/sessions/${encodeURIComponent(state.selected.id)}/rename`, {
+    method: 'POST',
+    body: JSON.stringify({ title: title.trim() }),
+  });
+  if (!data.ok) throw new Error(data.output || 'Rename failed');
+  await loadSessions();
+  await loadSession(state.selected.id);
+}
+
+async function deleteSession() {
+  if (!state.selected) return;
+  if (!confirm(`确定删除会话？\n${state.selected.title}\n${state.selected.id}`)) return;
+  const id = state.selected.id;
+  const data = await api(`/api/sessions/${encodeURIComponent(id)}/delete`, { method: 'POST', body: '{}' });
+  if (!data.ok) throw new Error(data.output || 'Delete failed');
+  state.selectedId = null;
+  state.selected = null;
+  $('detail').classList.add('hidden');
+  $('emptyState').classList.remove('hidden');
+  await loadSessions();
+}
+
+let searchTimer;
+$('searchInput').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(loadSessions, 250);
+});
+$('refreshBtn').addEventListener('click', loadSessions);
+$('newChatBtn').addEventListener('click', createNewChat);
+$('copyResumeBtn').addEventListener('click', copyResume);
+$('renameBtn').addEventListener('click', () => renameSession().catch(alert));
+$('deleteBtn').addEventListener('click', () => deleteSession().catch(alert));
+$('chatForm').addEventListener('submit', sendMessage);
+$('attachBtn').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', event => {
+  addAttachments(event.target.files);
+  event.target.value = '';
+});
+$('chatInput').addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    $('chatForm').requestSubmit();
+  }
+});
+
+loadSessions().catch(err => {
+  $('sessionList').innerHTML = `<div class="empty"><p>${escapeHtml(err.message)}</p></div>`;
+});
