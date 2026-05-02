@@ -198,7 +198,7 @@ def send_chat_message(session_id: str, message: str) -> tuple[bool, str]:
 
 def create_new_session() -> tuple[bool, str, str | None]:
     ok, out = run_hermes_command(
-        ["chat", "--quiet", "--yolo", "--query", "请只回复：新对话已创建"],
+        ["chat", "--quiet", "--yolo", "--query", "Please reply only: New conversation created"],
         timeout=300,
     )
     matches = re.findall(r"\b\d{8}_\d{6}_[a-f0-9]+\b", out)
