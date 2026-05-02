@@ -1,9 +1,9 @@
 :root {
   color-scheme: dark;
-  --bg: #080604;
-  --bg-soft: #0f0c09;
-  --panel: #15110d;
-  --panel-strong: #201811;
+  --bg: #17110d;
+  --bg-soft: #211812;
+  --panel: #241a13;
+  --panel-strong: #302218;
   --panel-2: #f37021;
   --text: #f7efe4;
   --muted: rgba(247, 239, 228, 0.80);
@@ -29,7 +29,7 @@ body {
 .app { display: grid; grid-template-columns: 360px 1fr; height: 100vh; }
 .sidebar {
   border-right: 1px solid var(--line);
-  background: linear-gradient(180deg, #120d09, #080604 76%);
+  background: linear-gradient(180deg, #241810, #17110d 76%);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -59,7 +59,7 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
   padding: 12px;
   border-radius: 12px;
   border: 1px solid var(--line);
-  background: rgba(21, 17, 13, 0.92);
+  background: rgba(36, 26, 19, 0.92);
   color: var(--text);
   outline: none;
 }
@@ -70,7 +70,7 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
   width: calc(100% - 36px);
   background: linear-gradient(135deg, #ff8a2a, var(--accent));
   border-color: var(--accent);
-  color: #140b04;
+  color: #211006;
   font-weight: 800;
   box-shadow: 0 12px 28px rgba(243, 112, 33, 0.20);
 }
@@ -90,7 +90,7 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
 .session-card h3 { margin: 0 0 6px; font-size: 15px; line-height: 1.3; }
 .session-card p { margin: 0 0 8px; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .badges { display: flex; gap: 6px; flex-wrap: wrap; }
-.badge { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 7px; background: rgba(255, 255, 255, 0.03); }
+.badge { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 7px; background: rgba(255, 255, 255, 0.05); }
 .main { overflow: auto; padding-bottom: 16px; background: linear-gradient(180deg, rgba(243, 112, 33, 0.04), transparent 22%); }
 .empty { max-width: 720px; margin: 20vh auto; text-align: center; color: var(--muted); }
 .empty h2 { color: var(--text); }
@@ -104,7 +104,7 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
   margin: 16px 0;
   padding: 13px;
   border: 1px solid var(--line);
-  background: rgba(21, 17, 13, 0.84);
+  background: rgba(36, 26, 19, 0.86);
   border-radius: 14px;
   color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -120,7 +120,7 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
   align-items: start;
 }
 .message.user { grid-template-columns: 1fr 72px; }
-.message.user .avatar { grid-column: 2; grid-row: 1; background: linear-gradient(135deg, #ff8a2a, var(--accent)); color: #130b05; }
+.message.user .avatar { grid-column: 2; grid-row: 1; background: linear-gradient(135deg, #ff8a2a, var(--accent)); color: #211006; }
 .message.user .bubble { grid-column: 1; grid-row: 1; justify-self: end; background: rgba(243, 112, 33, 0.13); border-color: rgba(243, 112, 33, 0.38); }
 .avatar {
   width: 58px;
@@ -130,7 +130,7 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
   justify-content: center;
   border: 1px solid var(--line);
   border-radius: 999px;
-  color: #130b05;
+  color: #211006;
   background: var(--accent);
   font-size: 13px;
   font-weight: 800;
@@ -139,7 +139,7 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
   max-width: 760px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: rgba(21, 17, 13, 0.92);
+  background: rgba(36, 26, 19, 0.92);
   overflow: hidden;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.20);
 }
@@ -159,7 +159,7 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
   padding: var(--composer-pad);
   border: 1px solid var(--line-strong);
   border-radius: 22px;
-  background: rgba(15, 12, 9, 0.94);
+  background: rgba(33, 24, 18, 0.94);
   backdrop-filter: blur(12px);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(243, 112, 33, 0.08);
 }
@@ -226,7 +226,7 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
   padding: 0 18px;
   background: linear-gradient(135deg, #ff8a2a, var(--accent));
   border-color: var(--accent);
-  color: #130b05;
+  color: #211006;
   font-weight: 800;
 }
 .composer button:disabled {
@@ -234,7 +234,7 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
   cursor: wait;
 }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.03); }
+::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
 ::-webkit-scrollbar-thumb { background: rgba(243, 112, 33, 0.40); border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(243, 112, 33, 0.62); }
 @media (max-width: 900px) {
