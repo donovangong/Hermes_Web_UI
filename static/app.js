@@ -104,6 +104,14 @@ async function loadSession(id) {
   renderDetail();
 }
 
+function scrollMessageContentsToBottom() {
+  document.querySelectorAll('#messages .content').forEach(content => {
+    if (content.scrollHeight > content.clientHeight) {
+      content.scrollTop = content.scrollHeight;
+    }
+  });
+}
+
 function renderDetail() {
   const s = state.selected;
   $('emptyState').classList.add('hidden');
@@ -135,6 +143,7 @@ function renderDetail() {
   `).join('') : '<div class="empty inline"><p>No user/assistant messages to display in this session.</p></div>';
 
   requestAnimationFrame(() => {
+    scrollMessageContentsToBottom();
     const main = document.querySelector('.main');
     main.scrollTo({ top: main.scrollHeight, behavior: 'smooth' });
   });

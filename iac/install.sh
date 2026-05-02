@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 SERVICE_NAME="hermes-ui"
-PROJECT_DIR="/root/Hermes_Agent_Web"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 IAC_DIR="${PROJECT_DIR}/iac"
 SERVICE_SRC="${IAC_DIR}/${SERVICE_NAME}.service"
 SERVICE_DEST="/etc/systemd/system/${SERVICE_NAME}.service"

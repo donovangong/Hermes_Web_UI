@@ -1,18 +1,18 @@
 [Unit]
 Description=Hermes Agent Web
-Documentation=file:/root/Hermes_Agent_Web/iac/README.md
+Documentation=https://github.com/donovangong/Hermes_Agent_Web
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/root/Hermes_Agent_Web
+WorkingDirectory=/opt/hermes-agent-web
 Environment=HERMES_UI_HOST=0.0.0.0
 Environment=HERMES_UI_PORT=8765
-Environment=HERMES_HOME=/root/.hermes
-Environment=HERMES_STATE_DB=/root/.hermes/state.db
-Environment=HERMES_SESSION_DIR=/root/.hermes/sessions
-ExecStart=/usr/bin/python3 /root/Hermes_Agent_Web/app.py
+Environment=HERMES_HOME=/opt/hermes-agent-web/.hermes
+Environment=HERMES_STATE_DB=/opt/hermes-agent-web/.hermes/state.db
+Environment=HERMES_SESSION_DIR=/opt/hermes-agent-web/.hermes/sessions
+ExecStart=/usr/bin/python3 /opt/hermes-agent-web/app.py
 Restart=always
 RestartSec=3
 
