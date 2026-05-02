@@ -147,7 +147,7 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
 .empty.inline { margin: 24px auto; }
 .composer {
   --composer-pad: 13px;
-  --composer-control-height: 62px;
+  --composer-control-height: 52px;
   position: sticky;
   bottom: 0;
   max-width: 980px;
