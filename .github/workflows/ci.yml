@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Basic validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Python syntax check
+        run: |
+          python - <<'PY'
+          import pathlib
+          import py_compile
+          import tempfile
+          import shutil
+
+          root = pathlib.Path('.')
+          tmp = pathlib.Path(tempfile.mkdtemp())
+          try:
+              for path in root.rglob('*.py'):
+                  if '.git' in path.parts or '.venv' in path.parts:
+                      continue
+                  py_compile.compile(str(path), cfile=str(tmp / f'{path.name}.pyc'), doraise=True)
+              print('python syntax ok')
+          finally:
+              shutil.rmtree(tmp)
+          PY
+
+      - name: JavaScript syntax check
+        run: |
+          node --check static/app.js
+
+      - name: Shell syntax check
+        run: |
+          bash -n iac/install.sh
+          bash -n iac/status.sh
+          bash -n iac/uninstall.sh
+
+      - name: Sensitive data scan
+        run: |
+          ! grep -RInE 'API_KEY|SECRET|TOKEN|PASSWORD|session_[0-9]{8}|BEGIN (RSA|OPENSSH|PRIVATE) KEY|192\.168\.|10\.[0-9]+\.|172\.(1[6-9]|2[0-9]|3[0-1])\.' . \
+            --exclude-dir=.git \
+            --exclude-dir=.github \
+            --exclude-dir=images \
+            --exclude='*.png' \
+            --exclude='*.jpg' \
+            --exclude='*.jpeg' \
+            --exclude='*.gif'
+
+      - name: Start app smoke test
+        run: |
+          python app.py > /tmp/hermes-ui.log 2>&1 &
+          APP_PID=$!
+          trap 'kill ${APP_PID} 2>/dev/null || true' EXIT
+
+          for _ in {1..20}; do
+            if curl -fsS http://127.0.0.1:8765/api/health; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl -fsS http://127.0.0.1:8765/api/health | grep -q '"ok": true'
+          curl -fsS http://127.0.0.1:8765/ > /tmp/index.html
+          grep -q 'Hermes UI' /tmp/index.html
