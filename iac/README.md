@@ -1,21 +1,21 @@
 # Hermes UI IaC
 
-One-command systemd deployment for `/root/hermes_UI`.
+One-command systemd deployment for `/root/Hermes_Agent_Web`.
 
 ## What this installs
 
 - systemd service: `hermes-ui`
 - service file: `/etc/systemd/system/hermes-ui.service`
 - bind address: `0.0.0.0:8765`
-- project directory: `/root/hermes_UI`
-- app entrypoint: `/root/hermes_UI/app.py`
+- project directory: `/root/Hermes_Agent_Web`
+- app entrypoint: `/root/Hermes_Agent_Web/app.py`
 
 This makes the UI start automatically whenever the VM boots.
 
 ## Install / update
 
 ```bash
-cd /root/hermes_UI/iac
+cd /root/Hermes_Agent_Web/iac
 sudo ./install.sh
 ```
 
@@ -33,7 +33,7 @@ The script will:
 ## Check status
 
 ```bash
-cd /root/hermes_UI/iac
+cd /root/Hermes_Agent_Web/iac
 ./status.sh
 ```
 
@@ -88,8 +88,8 @@ sudo systemctl stop hermes-ui
 ## Uninstall service only
 
 ```bash
-cd /root/hermes_UI/iac
+cd /root/Hermes_Agent_Web/iac
 sudo ./uninstall.sh
 ```
 
-This removes the systemd service but does not delete `/root/hermes_UI`.
+This removes the systemd service but does not delete `/root/Hermes_Agent_Web`.

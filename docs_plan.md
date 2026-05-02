@@ -1,4 +1,4 @@
-# Hermes Web UI MVP Implementation Plan
+# Hermes Agent Web MVP Implementation Plan
 
 **Goal:** Build a lightweight local browser UI to browse and continue Hermes Agent sessions.
 

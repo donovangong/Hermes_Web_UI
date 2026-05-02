@@ -1,4 +1,4 @@
-# Hermes Web UI
+# Hermes Agent Web
 
 A lightweight local web interface for browsing and continuing Hermes Agent sessions from a browser.
 
@@ -38,7 +38,7 @@ This project is intentionally simple:
 ## Run
 
 ```bash
-cd Hermes_Web_UI
+cd Hermes_Agent_Web
 python app.py
 ```
 
@@ -98,7 +98,7 @@ Do not commit any of the following:
 ```bash
 git init
 git add .
-git commit -m "feat: initial Hermes Web UI"
+git commit -m "feat: initial Hermes Agent Web"
 git branch -M main
 git remote add origin git@github.com:<your-user>/<your-repo>.git
 git push -u origin main

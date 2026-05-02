@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 SERVICE_NAME="hermes-ui"
-PROJECT_DIR="/root/hermes_UI"
+PROJECT_DIR="/root/Hermes_Agent_Web"
 IAC_DIR="${PROJECT_DIR}/iac"
 SERVICE_SRC="${IAC_DIR}/${SERVICE_NAME}.service"
 SERVICE_DEST="/etc/systemd/system/${SERVICE_NAME}.service"
@@ -79,7 +79,7 @@ fi
 
 VM_IPS="$(hostname -I 2>/dev/null | xargs || true)"
 echo
-echo "Hermes Web UI installed."
+echo "Hermes Agent Web installed."
 echo "Local URL: http://127.0.0.1:${PORT}"
 if [[ -n "${VM_IPS}" ]]; then
   echo "VM IP candidates: ${VM_IPS}"
