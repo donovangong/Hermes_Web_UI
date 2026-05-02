@@ -83,11 +83,15 @@ function renderSessions() {
   });
 }
 
-async function loadSessions() {
+async function loadSessions(options = {}) {
   const q = encodeURIComponent($('searchInput').value.trim());
   const data = await api(`/api/sessions?q=${q}`);
   state.sessions = data.sessions;
   renderSessions();
+
+  if (options.selectFirst && !state.selectedId && state.sessions.length) {
+    await loadSession(state.sessions[0].id);
+  }
 }
 
 async function loadSession(id) {
@@ -261,6 +265,6 @@ $('chatInput').addEventListener('keydown', event => {
   }
 });
 
-loadSessions().catch(err => {
+loadSessions({ selectFirst: true }).catch(err => {
   $('sessionList').innerHTML = `<div class="empty"><p>${escapeHtml(err.message)}</p></div>`;
 });

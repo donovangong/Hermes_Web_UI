@@ -127,16 +127,19 @@ button.danger { color: var(--danger); }
 .content { padding: 15px 17px; white-space: pre-wrap; line-height: 1.6; overflow-wrap: anywhere; max-height: 720px; overflow: auto; }
 .empty.inline { margin: 24px auto; }
 .composer {
+  --composer-pad: 13px;
+  --composer-control-height: 62px;
   position: sticky;
   bottom: 0;
   max-width: 980px;
   margin: 14px auto 0;
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 10px;
-  padding: 10px;
+  align-items: center;
+  gap: var(--composer-pad);
+  padding: var(--composer-pad);
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 22px;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(10px);
   box-shadow: 0 12px 34px rgba(0, 51, 141, 0.14);
@@ -146,6 +149,9 @@ button.danger { color: var(--danger); }
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.attachment-list:empty {
+  display: none;
 }
 .attachment-chip {
   display: inline-flex;
@@ -174,25 +180,30 @@ button.danger { color: var(--danger); }
   line-height: 1;
 }
 .attach-btn {
-  min-width: 78px;
+  min-width: 102px;
+  height: var(--composer-control-height);
+  padding: 0 18px;
   background: #ffffff;
   color: var(--accent-dark);
 }
 .composer textarea {
-  min-height: 48px;
+  height: var(--composer-control-height);
+  min-height: var(--composer-control-height);
   max-height: 180px;
   resize: vertical;
   border: 0;
   outline: none;
   color: var(--text);
   background: transparent;
-  padding: 12px 10px;
+  padding: 15px 10px;
   line-height: 1.45;
   font: inherit;
 }
 .composer button {
-  min-width: 84px;
-  align-self: end;
+  min-width: 102px;
+  height: var(--composer-control-height);
+  align-self: center;
+  padding: 0 18px;
   background: var(--accent-dark);
   border-color: var(--accent-dark);
   color: #ffffff;

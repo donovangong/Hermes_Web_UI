@@ -1,0 +1,20 @@
+[Unit]
+Description=Hermes Web UI
+Documentation=file:/root/hermes_UI/iac/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/hermes_UI
+Environment=HERMES_UI_HOST=0.0.0.0
+Environment=HERMES_UI_PORT=8765
+Environment=HERMES_HOME=/root/.hermes
+Environment=HERMES_STATE_DB=/root/.hermes/state.db
+Environment=HERMES_SESSION_DIR=/root/.hermes/sessions
+ExecStart=/usr/bin/python3 /root/hermes_UI/app.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
