@@ -29,6 +29,10 @@ SESSION_JSON_DIR = Path(os.environ.get("HERMES_SESSION_DIR", HERMES_HOME / "sess
 HOST = os.environ.get("HERMES_UI_HOST", "127.0.0.1")
 PORT = int(os.environ.get("HERMES_UI_PORT", "8765"))
 
+NEW_SESSION_TITLE = "new session"
+NEW_SESSION_SEED_PROMPT = "Reply exactly in English and do not translate: New conversation created"
+TITLE_MAX_LENGTH = 64
+
 
 def db() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
@@ -63,6 +67,79 @@ def short_text(value: str | None, limit: int = 180) -> str:
         return ""
     text = " ".join(str(value).split())
     return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def clean_title_source(value: str | None) -> str:
+    """Normalize a user message before deriving an automatic session title."""
+    if not value:
+        return ""
+    text = str(value)
+    attachment_marker = "以下是我随消息附上的文件内容"
+    if attachment_marker in text:
+        text = text.split(attachment_marker, 1)[0]
+    text = re.sub(r"```.*?```", " ", text, flags=re.S)
+    text = re.sub(r"https?://\S+", " ", text)
+    text = " ".join(text.split())
+    return text.strip(" -_.,，。;；:：!?！？、/\\|")
+
+
+def first_clause(value: str, limit: int = 32) -> str:
+    text = clean_title_source(value)
+    if not text:
+        return ""
+    pieces = re.split(r"(?<=[。！？!?；;\.])\s+|[\n\r]+|[。！？!?；;]", text)
+    clause = next((piece.strip() for piece in pieces if piece.strip()), text)
+    return short_text(clause, limit)
+
+
+def build_auto_title(second_user_message: str, third_user_message: str) -> str:
+    """Build one fixed title from the visible 2nd and 3rd user messages."""
+    parts = [part for part in (first_clause(second_user_message), first_clause(third_user_message)) if part]
+    if not parts:
+        return NEW_SESSION_TITLE
+    title = " / ".join(parts)
+    return short_text(title, TITLE_MAX_LENGTH) or NEW_SESSION_TITLE
+
+
+def visible_user_messages(conn: sqlite3.Connection, session_id: str) -> list[str]:
+    rows = conn.execute(
+        """
+        SELECT content
+        FROM messages
+        WHERE session_id = ? AND role = 'user' AND content IS NOT NULL
+        ORDER BY timestamp ASC, id ASC
+        """,
+        (session_id,),
+    ).fetchall()
+    messages = []
+    for row in rows:
+        content = (row["content"] or "").strip()
+        if not content or content == NEW_SESSION_SEED_PROMPT:
+            continue
+        messages.append(content)
+    return messages
+
+
+def maybe_generate_session_title(session_id: str) -> str | None:
+    """Generate the title once when visible user message #4 arrives.
+
+    The trigger is the 4th visible user message, but the title content is still
+    based only on visible user messages #2 and #3.
+    """
+    with db() as conn:
+        row = conn.execute("SELECT title FROM sessions WHERE id = ?", (session_id,)).fetchone()
+        if not row:
+            return None
+        current_title = (row["title"] or "").strip()
+        if current_title and current_title != NEW_SESSION_TITLE:
+            return current_title
+        user_messages = visible_user_messages(conn, session_id)
+        if len(user_messages) < 4:
+            return current_title or NEW_SESSION_TITLE
+        title = build_auto_title(user_messages[1], user_messages[2])
+        conn.execute("UPDATE sessions SET title = ? WHERE id = ?", (title, session_id))
+        conn.commit()
+        return title
 
 
 def get_sessions(query: str = "") -> list[dict]:
@@ -103,7 +180,7 @@ def get_sessions(query: str = "") -> list[dict]:
         rows = conn.execute(sql, (query.strip(), q, q, q, q)).fetchall()
     result = []
     for row in rows:
-        title = row["title"] or short_text(row["first_user_message"], 48) or row["id"]
+        title = row["title"] or NEW_SESSION_TITLE
         result.append(
             {
                 "id": row["id"],
@@ -139,7 +216,7 @@ def get_session(session_id: str) -> dict | None:
         ).fetchall()
     return {
         "id": session["id"],
-        "title": session["title"] or session["id"],
+        "title": session["title"] or NEW_SESSION_TITLE,
         "source": session["source"],
         "model": session["model"],
         "started_at": iso_from_epoch(session["started_at"]),
@@ -198,7 +275,7 @@ def send_chat_message(session_id: str, message: str) -> tuple[bool, str]:
 
 def create_new_session() -> tuple[bool, str, str | None]:
     ok, out = run_hermes_command(
-        ["chat", "--quiet", "--yolo", "--query", "Reply exactly in English and do not translate: New conversation created"],
+        ["chat", "--quiet", "--yolo", "--query", NEW_SESSION_SEED_PROMPT],
         timeout=300,
     )
     matches = re.findall(r"\b\d{8}_\d{6}_[a-f0-9]+\b", out)
@@ -206,6 +283,10 @@ def create_new_session() -> tuple[bool, str, str | None]:
     if not session_id:
         sessions = get_sessions("")
         session_id = sessions[0]["id"] if sessions else None
+    if session_id:
+        with db() as conn:
+            conn.execute("UPDATE sessions SET title = ? WHERE id = ?", (NEW_SESSION_TITLE, session_id))
+            conn.commit()
     return ok, out, session_id
 
 
@@ -333,6 +414,7 @@ class Handler(BaseHTTPRequestHandler):
                 return error(self, "Session not found", 404)
             final_message = build_message_with_attachments(message, files)
             ok, out = send_chat_message(session_id, final_message)
+            maybe_generate_session_title(session_id)
             session = get_session(session_id)
             return json_response(
                 self,
