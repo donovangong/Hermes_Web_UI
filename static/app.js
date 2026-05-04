@@ -112,6 +112,40 @@ function scrollMessageContentsToBottom() {
   });
 }
 
+function updateChatInputSize() {
+  const input = $('chatInput');
+  if (!input) return;
+
+  input.classList.remove('two-lines', 'scroll-lines');
+
+  const style = getComputedStyle(input);
+  const lineHeight = parseFloat(style.lineHeight) || 22;
+  const paddingLeft = parseFloat(style.paddingLeft) || 0;
+  const paddingRight = parseFloat(style.paddingRight) || 0;
+  const measure = document.createElement('div');
+  measure.style.position = 'absolute';
+  measure.style.visibility = 'hidden';
+  measure.style.pointerEvents = 'none';
+  measure.style.zIndex = '-1';
+  measure.style.width = `${Math.max(0, input.clientWidth - paddingLeft - paddingRight)}px`;
+  measure.style.font = style.font;
+  measure.style.lineHeight = style.lineHeight;
+  measure.style.whiteSpace = 'pre-wrap';
+  measure.style.overflowWrap = 'break-word';
+  measure.style.wordBreak = 'break-word';
+  measure.textContent = input.value ? input.value.replace(/\n$/u, '\n ') : 'x';
+  document.body.appendChild(measure);
+  const lineCount = input.value ? Math.max(1, Math.round(measure.scrollHeight / lineHeight)) : 1;
+  measure.remove();
+
+  if (lineCount >= 2) {
+    input.classList.add('two-lines');
+  }
+  if (lineCount > 2) {
+    input.classList.add('scroll-lines');
+  }
+}
+
 function renderDetail() {
   const s = state.selected;
   $('emptyState').classList.add('hidden');
@@ -188,6 +222,7 @@ async function sendMessage(event) {
     { role: 'assistant', content: 'Hermes is replying...', timestamp: '' },
   ];
   input.value = '';
+  updateChatInputSize();
   state.attachments = [];
   renderAttachments();
   renderDetail();
@@ -215,6 +250,7 @@ async function sendMessage(event) {
     $('sendBtn').disabled = false;
     $('sendBtn').textContent = 'Send';
     input.focus();
+    updateChatInputSize();
   }
 }
 
@@ -273,6 +309,8 @@ $('chatInput').addEventListener('keydown', event => {
     $('chatForm').requestSubmit();
   }
 });
+$('chatInput').addEventListener('input', updateChatInputSize);
+updateChatInputSize();
 
 loadSessions({ selectFirst: true }).catch(err => {
   $('sessionList').innerHTML = `<div class="empty"><p>${escapeHtml(err.message)}</p></div>`;
