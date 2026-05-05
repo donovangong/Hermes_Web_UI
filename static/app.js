@@ -1,4 +1,6 @@
 const state = { sessions: [], selectedId: null, selected: null, attachments: [], sending: false };
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 const $ = (id) => document.getElementById(id);
 
@@ -25,6 +27,61 @@ function formatFileSize(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function parseAttachmentMessage(content, explicitAttachments = []) {
+  const text = String(content || '');
+  const attachments = explicitAttachments.map(file => ({
+    name: file.name,
+    size: typeof file.size === 'number' ? formatFileSize(file.size) : (file.size_display || file.size || ''),
+  }));
+
+  let messageText = text.trim();
+  const markers = ['\n\n[attachments]', '\n\n[附件]', '\n\n用户上传了以下附件'];
+  const marker = markers
+    .map(value => ({ value, index: text.indexOf(value) }))
+    .filter(item => item.index >= 0)
+    .sort((a, b) => a.index - b.index)[0];
+
+  if (marker) {
+    messageText = text.slice(0, marker.index).trim();
+    const attachmentText = text.slice(marker.index);
+    const newPattern = /^\d+\.\s*(.+)\npath:\s*(.+)\nsize:\s*(.+)$/gmi;
+    const oldPattern = /附件\s+\d+:\s*(.+)\n路径：\s*(.+)\n大小：\s*(.+)/g;
+    for (const pattern of [newPattern, oldPattern]) {
+      let match;
+      while ((match = pattern.exec(attachmentText)) !== null) {
+        attachments.push({ name: match[1].trim(), size: match[3].trim() });
+      }
+    }
+  }
+
+  return { text: messageText, attachments };
+}
+
+function renderMessageContent(message) {
+  if (message.role !== 'user') {
+    return `<div class="content">${escapeHtml(message.content || '')}</div>`;
+  }
+
+  const parsed = parseAttachmentMessage(message.content, message.attachments || []);
+  const pieces = [];
+  if (parsed.attachments.length) {
+    pieces.push(`
+      <div class="message-attachments">
+        ${parsed.attachments.map(file => `
+          <div class="attachment-chip">
+            <span>${escapeHtml(file.name)}</span>
+            ${file.size ? `<small>${escapeHtml(file.size)}</small>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `);
+  }
+  if (parsed.text) {
+    pieces.push(`<div class="content">${escapeHtml(parsed.text)}</div>`);
+  }
+  return pieces.join('') || '<div class="content">[attachment]</div>';
+}
+
 function renderAttachments() {
   const box = $('attachmentList');
   if (!state.attachments.length) {
@@ -35,7 +92,7 @@ function renderAttachments() {
     <div class="attachment-chip">
       <span>${escapeHtml(file.name)}</span>
       <small>${formatFileSize(file.size)}</small>
-      <button type="button" data-index="${index}" aria-label="Remove attachment">×</button>
+      <button type="button" data-index="${index}" aria-label="Delete attachment">delete</button>
     </div>
   `).join('');
   box.querySelectorAll('button').forEach(btn => {
@@ -48,15 +105,22 @@ function renderAttachments() {
 
 function addAttachments(fileList) {
   const incoming = Array.from(fileList || []);
-  const remaining = 5 - state.attachments.length;
+  const validFiles = incoming.filter(file => {
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      alert(`${file.name} is too large. Each attachment can be up to 10 MB.`);
+      return false;
+    }
+    return true;
+  });
+  const remaining = MAX_ATTACHMENTS - state.attachments.length;
   if (remaining <= 0) {
-    alert('You can attach up to 5 files.');
+    alert(`You can attach up to ${MAX_ATTACHMENTS} files.`);
     return;
   }
-  if (incoming.length > remaining) {
+  if (validFiles.length > remaining) {
     alert(`You can add ${remaining} attachment(s)`);
   }
-  state.attachments.push(...incoming.slice(0, remaining));
+  state.attachments.push(...validFiles.slice(0, remaining));
   renderAttachments();
 }
 
@@ -171,7 +235,7 @@ function renderDetail() {
     <article class="message ${escapeHtml(m.role)}">
       <div class="avatar">${escapeHtml(m.label)}</div>
       <div class="bubble">
-        <div class="content">${escapeHtml(m.content || '')}</div>
+        ${renderMessageContent(m)}
       </div>
     </article>
   `).join('') : '<div class="empty inline"><p>No user/assistant messages to display in this session.</p></div>';
@@ -218,7 +282,7 @@ async function sendMessage(event) {
   const previousMessages = state.selected.messages || [];
   state.selected.messages = [
     ...previousMessages,
-    { role: 'user', content: message || `[Sent ${filesToSend.length} attachment(s)]`, timestamp: '' },
+    { role: 'user', content: message, attachments: filesToSend, timestamp: '' },
     { role: 'assistant', content: 'Hermes is replying...', timestamp: '' },
   ];
   input.value = '';

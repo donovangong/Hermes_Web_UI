@@ -162,6 +162,15 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.20);
 }
 .content { padding: 15px 17px; white-space: pre-wrap; line-height: 1.6; overflow-wrap: anywhere; max-height: 720px; overflow: auto; color: var(--text); }
+.message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 13px;
+}
+.message-attachments + .content {
+  border-top: 1px solid var(--line);
+}
 .empty.inline { margin: 24px auto; }
 .composer {
   --composer-pad: 13px;
@@ -210,9 +219,9 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
   align-items: center;
   gap: 7px;
   max-width: 260px;
-  padding: 6px 8px;
+  padding: 7px 8px 7px 12px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--accent-soft);
   color: var(--text);
   font-size: 12px;
@@ -225,10 +234,10 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
 .attachment-chip small { color: var(--muted); }
 .attachment-chip button {
   min-width: auto;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border-radius: 50%;
+  width: auto;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 10px;
   line-height: 1;
 }
 .attach-btn {
@@ -284,6 +293,18 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
 .composer button:disabled {
   opacity: 0.65;
   cursor: wait;
+}
+.composer .attachment-chip button {
+  min-width: auto;
+  width: auto;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ff8a2a, var(--accent));
+  border-color: var(--accent);
+  color: #211006;
+  font-size: 12px;
+  font-weight: 800;
 }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }

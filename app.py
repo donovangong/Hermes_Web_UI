@@ -25,13 +25,17 @@ STATIC = ROOT / "static"
 HERMES_HOME = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes")).expanduser()
 DB_PATH = Path(os.environ.get("HERMES_STATE_DB", HERMES_HOME / "state.db")).expanduser()
 SESSION_JSON_DIR = Path(os.environ.get("HERMES_SESSION_DIR", HERMES_HOME / "sessions")).expanduser()
+UPLOAD_ROOT = Path(os.environ.get("HERMES_UI_UPLOAD_ROOT", ROOT / "uploads")).expanduser()
 
 HOST = os.environ.get("HERMES_UI_HOST", "127.0.0.1")
 PORT = int(os.environ.get("HERMES_UI_PORT", "8765"))
 
 NEW_SESSION_TITLE = "new session"
+NEW_SESSION_TITLE_PREFIX = "new_session_"
 NEW_SESSION_SEED_PROMPT = "Reply exactly in English and do not translate: New conversation created"
 TITLE_MAX_LENGTH = 64
+MAX_ATTACHMENTS = 5
+MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 
 def db() -> sqlite3.Connection:
@@ -74,9 +78,9 @@ def clean_title_source(value: str | None) -> str:
     if not value:
         return ""
     text = str(value)
-    attachment_marker = "以下是我随消息附上的文件内容"
-    if attachment_marker in text:
-        text = text.split(attachment_marker, 1)[0]
+    for attachment_marker in ("以下是我随消息附上的文件内容", "用户上传了以下附件", "[attachments]"):
+        if attachment_marker in text:
+            text = text.split(attachment_marker, 1)[0]
     text = re.sub(r"```.*?```", " ", text, flags=re.S)
     text = re.sub(r"https?://\S+", " ", text)
     text = " ".join(text.split())
@@ -99,6 +103,49 @@ def build_auto_title(second_user_message: str, third_user_message: str) -> str:
         return NEW_SESSION_TITLE
     title = " / ".join(parts)
     return short_text(title, TITLE_MAX_LENGTH) or NEW_SESSION_TITLE
+
+
+def is_new_session_placeholder(title: str | None) -> bool:
+    text = (title or "").strip()
+    return not text or text == NEW_SESSION_TITLE or text.startswith(NEW_SESSION_TITLE_PREFIX)
+
+
+def build_initial_session_title(session_id: str | None) -> str:
+    """Build a unique, readable placeholder title for a just-created session."""
+    now = time.strftime("%Y%m%d%H%M%S", time.localtime())
+    if not session_id:
+        return f"{NEW_SESSION_TITLE_PREFIX}{now}"
+    match = re.match(r"^(\d{8})_(\d{6})_([A-Za-z0-9]+)$", session_id)
+    if match:
+        stamp = f"{match.group(1)}{match.group(2)}"
+        suffix = match.group(3)[:6]
+        return f"{NEW_SESSION_TITLE_PREFIX}{stamp}_{suffix}"
+    safe_id = re.sub(r"[^A-Za-z0-9]+", "", session_id)[-6:]
+    return f"{NEW_SESSION_TITLE_PREFIX}{now}_{safe_id}" if safe_id else f"{NEW_SESSION_TITLE_PREFIX}{now}"
+
+
+def make_unique_title(conn: sqlite3.Connection, title: str, session_id: str) -> str:
+    candidate = short_text(title, TITLE_MAX_LENGTH)
+    if not candidate:
+        candidate = build_initial_session_title(session_id)
+    base = candidate
+    counter = 2
+    while conn.execute(
+        "SELECT 1 FROM sessions WHERE title = ? AND id != ? LIMIT 1",
+        (candidate, session_id),
+    ).fetchone():
+        suffix = f"_{counter}"
+        candidate = short_text(base, TITLE_MAX_LENGTH - len(suffix)) + suffix
+        counter += 1
+    return candidate
+
+
+def set_session_title(session_id: str, title: str) -> str:
+    with db() as conn:
+        unique_title = make_unique_title(conn, title, session_id)
+        conn.execute("UPDATE sessions SET title = ? WHERE id = ?", (unique_title, session_id))
+        conn.commit()
+        return unique_title
 
 
 def visible_user_messages(conn: sqlite3.Connection, session_id: str) -> list[str]:
@@ -131,12 +178,12 @@ def maybe_generate_session_title(session_id: str) -> str | None:
         if not row:
             return None
         current_title = (row["title"] or "").strip()
-        if current_title and current_title != NEW_SESSION_TITLE:
+        if not is_new_session_placeholder(current_title):
             return current_title
         user_messages = visible_user_messages(conn, session_id)
         if len(user_messages) < 4:
             return current_title or NEW_SESSION_TITLE
-        title = build_auto_title(user_messages[1], user_messages[2])
+        title = make_unique_title(conn, build_auto_title(user_messages[1], user_messages[2]), session_id)
         conn.execute("UPDATE sessions SET title = ? WHERE id = ?", (title, session_id))
         conn.commit()
         return title
@@ -283,33 +330,83 @@ def create_new_session() -> tuple[bool, str, str | None]:
     if not session_id:
         sessions = get_sessions("")
         session_id = sessions[0]["id"] if sessions else None
-    if session_id:
-        with db() as conn:
-            conn.execute("UPDATE sessions SET title = ? WHERE id = ?", (NEW_SESSION_TITLE, session_id))
-            conn.commit()
+    if ok and session_id:
+        set_session_title(session_id, build_initial_session_title(session_id))
     return ok, out, session_id
 
 
-def decode_attachment(filename: str, data: bytes) -> str:
-    for encoding in ("utf-8", "utf-8-sig", "gb18030", "latin-1"):
+def safe_filename(filename: str) -> str:
+    name = Path(filename or "attachment").name.strip()
+    name = re.sub(r"[^A-Za-z0-9._()\-\u4e00-\u9fff ]+", "_", name)
+    name = re.sub(r"\s+", " ", name).strip(" .")
+    return name[:160] or "attachment"
+
+
+def format_bytes(size: int) -> str:
+    if size < 1024:
+        return f"{size} B"
+    if size < 1024 * 1024:
+        return f"{size / 1024:.1f} KB"
+    return f"{size / 1024 / 1024:.1f} MB"
+
+
+def append_attachment_metadata(session_dir: Path, records: list[dict]) -> None:
+    metadata_path = session_dir / "attachments.json"
+    existing = []
+    if metadata_path.exists():
         try:
-            return data.decode(encoding)
-        except UnicodeDecodeError:
-            continue
-    return data.decode("utf-8", errors="replace")
+            existing = json.loads(metadata_path.read_text(encoding="utf-8"))
+            if not isinstance(existing, list):
+                existing = []
+        except (OSError, json.JSONDecodeError):
+            existing = []
+    metadata_path.write_text(json.dumps(existing + records, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def build_message_with_attachments(message: str, files: list[dict]) -> str:
+def save_uploaded_attachments(session_id: str, files: list[dict]) -> list[dict]:
     if not files:
-        return message
-    parts = [message, "", "以下是我随消息附上的文件内容，请一起参考："]
+        return []
+    session_dir = UPLOAD_ROOT / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    uploaded_at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    stamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
+    records = []
     for index, item in enumerate(files, start=1):
-        filename = item["filename"]
-        content = decode_attachment(filename, item["data"])
+        original_name = item["filename"]
+        data = item["data"]
+        clean_name = safe_filename(original_name)
+        saved_name = f"{stamp}_{index:02d}_{clean_name}"
+        path = session_dir / saved_name
+        counter = 2
+        while path.exists():
+            saved_name = f"{stamp}_{index:02d}_{counter}_{clean_name}"
+            path = session_dir / saved_name
+            counter += 1
+        path.write_bytes(data)
+        records.append(
+            {
+                "original_name": original_name,
+                "saved_name": saved_name,
+                "path": str(path),
+                "size": len(data),
+                "size_display": format_bytes(len(data)),
+                "uploaded_at": uploaded_at,
+            }
+        )
+    append_attachment_metadata(session_dir, records)
+    return records
+
+
+def build_message_with_attachment_paths(message: str, attachments: list[dict]) -> str:
+    if not attachments:
+        return message
+    parts = [message, "", "[attachments]"]
+    for index, item in enumerate(attachments, start=1):
         parts.append(
-            f"\n--- 附件 {index}: {filename} ---\n"
-            f"```text\n{content}\n```\n"
-            f"--- 附件 {index} 结束 ---"
+            f"{index}. {item['original_name']}\n"
+            f"path: {item['path']}\n"
+            f"size: {item['size_display']}\n"
+            f"uploaded_at: {item['uploaded_at']}"
         )
     return "\n".join(parts)
 
@@ -379,8 +476,11 @@ class Handler(BaseHTTPRequestHandler):
             return error(self, str(exc), 400)
 
         if path == "/api/sessions/new":
-            ok, out, session_id = create_new_session()
-            session = get_session(session_id) if session_id else None
+            try:
+                ok, out, session_id = create_new_session()
+                session = get_session(session_id) if session_id else None
+            except Exception as exc:
+                return error(self, str(exc), 500)
             return json_response(
                 self,
                 {"ok": ok and bool(session), "output": out, "session": session},
@@ -405,14 +505,15 @@ class Handler(BaseHTTPRequestHandler):
             message = str(payload.get("message", "")).strip()
             if not message and not files:
                 return error(self, "Message or attachment is required")
-            if len(files) > 5:
-                return error(self, "最多只能添加 5 个附件", 400)
+            if len(files) > MAX_ATTACHMENTS:
+                return error(self, f"最多只能添加 {MAX_ATTACHMENTS} 个附件", 400)
             for item in files:
-                if len(item["data"]) > 1024 * 1024:
-                    return error(self, f"附件过大：{item['filename']}，单个文件最多 1MB", 400)
+                if len(item["data"]) > MAX_ATTACHMENT_BYTES:
+                    return error(self, f"附件过大：{item['filename']}，单个文件最多 {format_bytes(MAX_ATTACHMENT_BYTES)}", 400)
             if not get_session(session_id):
                 return error(self, "Session not found", 404)
-            final_message = build_message_with_attachments(message, files)
+            attachments = save_uploaded_attachments(session_id, files)
+            final_message = build_message_with_attachment_paths(message, attachments)
             ok, out = send_chat_message(session_id, final_message)
             maybe_generate_session_title(session_id)
             session = get_session(session_id)
