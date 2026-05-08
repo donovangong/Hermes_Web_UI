@@ -171,6 +171,22 @@ button.danger { color: var(--danger); border-color: rgba(255, 107, 95, 0.36); }
 .message-attachments + .content {
   border-top: 1px solid var(--line);
 }
+.download-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 17px 15px;
+}
+.download-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.download-link:hover {
+  color: #ff9b45;
+  text-decoration: underline;
+}
 .empty.inline { margin: 24px auto; }
 .composer {
   --composer-pad: 13px;

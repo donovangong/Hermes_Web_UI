@@ -27,15 +27,35 @@ function formatFileSize(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function parseAttachmentMessage(content, explicitAttachments = []) {
+function stripInternalInstructions(content) {
   const text = String(content || '');
+  const marker = '\n\n[web_ui_download_instructions]';
+  const index = text.indexOf(marker);
+  return index >= 0 ? text.slice(0, index) : text;
+}
+
+function renderDownloadLinks(downloads = []) {
+  if (!downloads.length) return '';
+  return `
+    <div class="download-links">
+      ${downloads.map(file => `
+        <a class="download-link" href="${escapeHtml(file.url)}" download>
+          下载 ${escapeHtml(file.name)}${file.size_display ? ` (${escapeHtml(file.size_display)})` : ''}
+        </a>
+      `).join('')}
+    </div>
+  `;
+}
+
+function parseAttachmentMessage(content, explicitAttachments = []) {
+  const text = stripInternalInstructions(content);
   const attachments = explicitAttachments.map(file => ({
     name: file.name,
     size: typeof file.size === 'number' ? formatFileSize(file.size) : (file.size_display || file.size || ''),
   }));
 
   let messageText = text.trim();
-  const markers = ['\n\n[attachments]', '\n\n[附件]', '\n\n用户上传了以下附件'];
+  const markers = ['\n\n[attachments]', '\n\n[附件]', '\n\n用户上传了以下附件', '\n\n[web_ui_download_instructions]'];
   const marker = markers
     .map(value => ({ value, index: text.indexOf(value) }))
     .filter(item => item.index >= 0)
@@ -59,7 +79,7 @@ function parseAttachmentMessage(content, explicitAttachments = []) {
 
 function renderMessageContent(message) {
   if (message.role !== 'user') {
-    return `<div class="content">${escapeHtml(message.content || '')}</div>`;
+    return `<div class="content">${escapeHtml(stripInternalInstructions(message.content || ''))}</div>${renderDownloadLinks(message.downloads || [])}`;
   }
 
   const parsed = parseAttachmentMessage(message.content, message.attachments || []);

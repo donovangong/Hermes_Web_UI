@@ -13,6 +13,7 @@ import json
 import mimetypes
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
 import time
@@ -26,6 +27,7 @@ HERMES_HOME = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes")).expan
 DB_PATH = Path(os.environ.get("HERMES_STATE_DB", HERMES_HOME / "state.db")).expanduser()
 SESSION_JSON_DIR = Path(os.environ.get("HERMES_SESSION_DIR", HERMES_HOME / "sessions")).expanduser()
 UPLOAD_ROOT = Path(os.environ.get("HERMES_UI_UPLOAD_ROOT", ROOT / "uploads")).expanduser()
+OUTPUT_ROOT = Path(os.environ.get("HERMES_UI_OUTPUT_ROOT", ROOT / "outputs")).expanduser()
 
 HOST = os.environ.get("HERMES_UI_HOST", "127.0.0.1")
 PORT = int(os.environ.get("HERMES_UI_PORT", "8765"))
@@ -78,7 +80,12 @@ def clean_title_source(value: str | None) -> str:
     if not value:
         return ""
     text = str(value)
-    for attachment_marker in ("以下是我随消息附上的文件内容", "用户上传了以下附件", "[attachments]"):
+    for attachment_marker in (
+        "以下是我随消息附上的文件内容",
+        "用户上传了以下附件",
+        "[attachments]",
+        "[web_ui_download_instructions]",
+    ):
         if attachment_marker in text:
             text = text.split(attachment_marker, 1)[0]
     text = re.sub(r"```.*?```", " ", text, flags=re.S)
@@ -287,6 +294,7 @@ def get_session(session_id: str) -> dict | None:
                 "tool_name": m["tool_name"],
                 "timestamp": iso_from_epoch(m["timestamp"]),
                 "finish_reason": m["finish_reason"],
+                "downloads": extract_downloads_from_message(session_id, m["content"] or "") if m["role"] == "assistant" else [],
             }
             for m in messages
         ],
@@ -342,6 +350,90 @@ def safe_filename(filename: str) -> str:
     return name[:160] or "attachment"
 
 
+def safe_session_id(session_id: str) -> str:
+    text = str(session_id or "")
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", text):
+        raise ValueError("Invalid session id")
+    return text
+
+
+def session_upload_dir(session_id: str) -> Path:
+    return UPLOAD_ROOT / safe_session_id(session_id)
+
+
+def session_output_dir(session_id: str) -> Path:
+    return OUTPUT_ROOT / safe_session_id(session_id)
+
+
+def resolve_session_output_file(session_id: str, filename: str) -> Path | None:
+    try:
+        base = session_output_dir(session_id).resolve()
+        file_path = (base / Path(filename).name).resolve()
+    except (OSError, ValueError):
+        return None
+    if file_path.parent != base or not file_path.exists() or not file_path.is_file():
+        return None
+    return file_path
+
+
+def extract_downloads_from_message(session_id: str, content: str) -> list[dict]:
+    """Find generated files in this session's output directory mentioned by Hermes."""
+    if not content:
+        return []
+    try:
+        base = session_output_dir(session_id).resolve()
+    except (OSError, ValueError):
+        return []
+    pattern = re.escape(str(base)) + r"/([^\s`'\")<>]+)"
+    seen = set()
+    downloads = []
+    for match in re.finditer(pattern, content):
+        filename = Path(match.group(1)).name
+        if not filename or filename in seen:
+            continue
+        file_path = resolve_session_output_file(session_id, filename)
+        if not file_path:
+            continue
+        size = file_path.stat().st_size
+        seen.add(filename)
+        downloads.append(
+            {
+                "name": filename,
+                "url": f"/api/sessions/{session_id}/downloads/{filename}",
+                "size": size,
+                "size_display": format_bytes(size),
+            }
+        )
+    return downloads
+
+
+def build_download_instruction(session_id: str) -> str:
+    out_dir = session_output_dir(session_id)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return (
+        "[web_ui_download_instructions]\n"
+        "If you create or modify any user-facing file in this reply, save the final downloadable copy under this exact directory:\n"
+        f"{out_dir}\n"
+        "After saving it, mention its absolute path in your final answer. The web UI will turn that path into a browser download link.\n"
+        "Do not use MEDIA: tags in this web UI."
+    )
+
+
+def append_download_instruction(message: str, session_id: str) -> str:
+    instruction = build_download_instruction(session_id)
+    if message:
+        return f"{message}\n\n{instruction}"
+    return instruction
+
+
+def cleanup_session_files(session_id: str) -> None:
+    for root in (UPLOAD_ROOT, OUTPUT_ROOT):
+        try:
+            shutil.rmtree(root / safe_session_id(session_id), ignore_errors=True)
+        except ValueError:
+            continue
+
+
 def format_bytes(size: int) -> str:
     if size < 1024:
         return f"{size} B"
@@ -366,7 +458,7 @@ def append_attachment_metadata(session_dir: Path, records: list[dict]) -> None:
 def save_uploaded_attachments(session_id: str, files: list[dict]) -> list[dict]:
     if not files:
         return []
-    session_dir = UPLOAD_ROOT / session_id
+    session_dir = session_upload_dir(session_id)
     session_dir.mkdir(parents=True, exist_ok=True)
     uploaded_at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     stamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
@@ -459,6 +551,16 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/sessions":
             query = parse_qs(parsed.query).get("q", [""])[0]
             return json_response(self, {"ok": True, "sessions": get_sessions(query)})
+        download_match = re.fullmatch(r"/api/sessions/([^/]+)/downloads/([^/]+)", path)
+        if download_match:
+            session_id = download_match.group(1)
+            filename = download_match.group(2)
+            if not get_session(session_id):
+                return error(self, "Session not found", 404)
+            file_path = resolve_session_output_file(session_id, filename)
+            if not file_path:
+                return error(self, "File not found", 404)
+            return self.serve_download(file_path)
         if path.startswith("/api/sessions/"):
             session_id = path.rsplit("/", 1)[-1]
             session = get_session(session_id)
@@ -498,6 +600,8 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/sessions/") and path.endswith("/delete"):
             session_id = path.split("/")[3]
             ok, out = run_hermes_command(["sessions", "delete", "--yes", session_id])
+            if ok:
+                cleanup_session_files(session_id)
             return json_response(self, {"ok": ok, "output": out}, 200 if ok else 500)
 
         if path.startswith("/api/sessions/") and path.endswith("/chat"):
@@ -513,7 +617,7 @@ class Handler(BaseHTTPRequestHandler):
             if not get_session(session_id):
                 return error(self, "Session not found", 404)
             attachments = save_uploaded_attachments(session_id, files)
-            final_message = build_message_with_attachment_paths(message, attachments)
+            final_message = append_download_instruction(build_message_with_attachment_paths(message, attachments), session_id)
             ok, out = send_chat_message(session_id, final_message)
             maybe_generate_session_title(session_id)
             session = get_session(session_id)
@@ -524,6 +628,16 @@ class Handler(BaseHTTPRequestHandler):
             )
 
         return error(self, "Unknown endpoint", 404)
+
+    def serve_download(self, file_path: Path) -> None:
+        body = file_path.read_bytes()
+        ctype = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Disposition", f'attachment; filename="{file_path.name}"')
+        self.end_headers()
+        self.wfile.write(body)
 
     def serve_static(self, path: str) -> None:
         if path in ("", "/"):

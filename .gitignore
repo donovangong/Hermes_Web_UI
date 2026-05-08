@@ -29,6 +29,7 @@ state.db
 sessions/
 logs/
 uploads/
+outputs/
 attachments/
 
 # OS/editor
